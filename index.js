@@ -19,6 +19,8 @@ app.use(
 const port = 8000;
 const OwnerInfo = mongoose.model("owner");
 const mongoUrl = "mongodb+srv://ms1903:linuxNoob92@cluster0.y4atc.mongodb.net/?retryWrites=true&w=majority";
+
+//variable to store path of image which will be temporarily stored
 let vehicle_number_plate_image = ""
 
 //specifying paramters to be used while storing image
@@ -48,6 +50,7 @@ const multerFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   fileFilter: multerFilter,
+  limits: { fileSize: 1024 * 1024 * 16 }
 });
 
 //variable to store vehicle_number_plate that wil
@@ -67,6 +70,14 @@ mongoose.connection.on("error", (err) => {
   throw err;
 });
 
+const deleteImg = (imagePath) => {
+  //deleting the file after it has been processed
+  fs.unlink(imagePath, (err) => {
+    if (err) throw err //handle your error the way you want to;
+    console.log(`${imagePath} was deleted`);//or else the file will be deleted
+  });
+
+}
 
 app.post("/owner_info", upload.single("image"), async (req, res) => {
 
@@ -89,17 +100,13 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
       vehicle_number_plate = error
     });
 
-  //deleting the file after it has been processed
-  fs.unlink(vehicle_number_plate_image, (err) => {
-    if (err) throw err //handle your error the way you want to;
-    console.log(`${vehicle_number_plate_image} was deleted`);//or else the file will be deleted
-  });
-
+  //delete image it has been processed
+  deleteImg(vehicle_number_plate_image)
 
   //finding if info of a person with the given number plate exists or not
   OwnerInfo.find({ "vehicle_number_plate": vehicle_number_plate })
     .then((data) => {
-      res.send(data == [] ? "No such Person Exists in DataBase!" : data);
+      res.send(data);
     })
     .catch((err) => {
       console.log(err);
