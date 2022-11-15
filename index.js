@@ -99,14 +99,19 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
     .catch(function(error) {
       vehicle_number_plate = error
     });
-
+    
   //delete image it has been processed
   deleteImg(vehicle_number_plate_image)
 
   //finding if info of a person with the given number plate exists or not
-  OwnerInfo.find({ "vehicle_number_plate": vehicle_number_plate })
+  const vehicle_to_find =  {"vehicle_number_plate": vehicle_number_plate} 
+  OwnerInfo.findOne({vehicle_to_find})
     .then((data) => {
-      res.send(data);
+      if (data == null) {
+        res.json({ "error": "No such vehicle found" })
+      } else {
+        res.send(data)
+      }
     })
     .catch((err) => {
       console.log(err);
