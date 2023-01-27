@@ -6,8 +6,10 @@ const FormData = require("form-data")
 const multer = require("multer")
 const axios = require("axios")
 const fs = require('fs')
-require("./OwnerInfo");
+const dotenv=require('dotenv')
 
+dotenv.config()
+require("./OwnerInfo");
 //using body Parser
 app.use(
   bodyParser.urlencoded({
@@ -18,7 +20,7 @@ app.use(
 //basic variables
 const port = 8000;
 const OwnerInfo = mongoose.model("owner");
-const mongoUrl = "mongodb+srv://ms1903:linuxNoob92@cluster0.y4atc.mongodb.net/?retryWrites=true&w=majority";
+const mongoUrl =process.env.MONGO_URL;
 
 //variable to store path of image which will be temporarily stored
 let vehicle_number_plate_image = ""
@@ -88,7 +90,7 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
   formdata.append("image", fs.createReadStream(vehicle_number_plate_image));
   //making  async post request to backend api because the ml model takes some 
   //time for processing
-  await axios.post("http://localhost:3000/vlpd_api", formdata, {
+  await axios.post(process.env.MODEL_API, formdata, {
     headers: {
       "Content-Type": "multipart/form-data"
     }
@@ -97,20 +99,37 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
       vehicle_number_plate = response.data
     })
     .catch(function(error) {
-      vehicle_number_plate = error
+      console.log(error)
     });
+    console.log(typeof vehicle_number_plate)
+ 
+    console.log(vehicle_number_plate)
     
   //delete image it has been processed
   deleteImg(vehicle_number_plate_image)
-
   //finding if info of a person with the given number plate exists or not
-  const vehicle_to_find =  {"vehicle_number_plate": vehicle_number_plate} 
-  OwnerInfo.findOne({vehicle_to_find})
+  const vehicle_to_find =  {vehicle_number_plate:"CG04MF2250"} 
+  // console.log(vehicle_to_find);
+
+  // async function resp(){
+  //     try{
+  //       const data=await OwnerInfo.findOne({"vehicle_number_plate":vehicle_number_plate})
+  //       console.log(data)
+  //       res.status(200).send(data)
+  //     }
+  //     catch(err){
+  //     console.log(err)
+  //     res.status(500).json("Error")
+  //   }
+  // }
+  // resp()
+  OwnerInfo.findOne(vehicle_to_find)
     .then((data) => {
+      console.log(data)
       if (data == null) {
-        res.json({ "error": "No such vehicle found" })
+        res.status(500).json({ "error": "No such vehicle found" })
       } else {
-        res.send(data)
+        res.status(200).send(data) 
       }
     })
     .catch((err) => {
