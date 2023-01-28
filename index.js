@@ -57,7 +57,7 @@ const upload = multer({
 
 //variable to store vehicle_number_plate that wil
 //be returned as response from ml flask api
-let vehicle_number_plate = "";
+let vehicle = "";
 
 mongoose.connect(mongoUrl, {
   useNewUrlParser: true,
@@ -96,38 +96,43 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
     }
   })
     .then(function(response) {
-      vehicle_number_plate = response.data
+      vehicle = response.data
     })
     .catch(function(error) {
       console.log(error)
     });
-    console.log(typeof vehicle_number_plate)
  
-    console.log(vehicle_number_plate)
+    // console.log(vehicle)
     
   //delete image it has been processed
   deleteImg(vehicle_number_plate_image)
   //finding if info of a person with the given number plate exists or not
-  const vehicle_to_find =  {vehicle_number_plate:"CG04MF2250"} 
-  // console.log(vehicle_to_find);
+  
+  //sanitizing input for spaces
+  let vehicleStr=""
 
-  // async function resp(){
-  //     try{
-  //       const data=await OwnerInfo.findOne({"vehicle_number_plate":vehicle_number_plate})
-  //       console.log(data)
-  //       res.status(200).send(data)
-  //     }
-  //     catch(err){
-  //     console.log(err)
-  //     res.status(500).json("Error")
-  //   }
-  // }
-  // resp()
-  OwnerInfo.findOne(vehicle_to_find)
+  for(let i=0;i<vehicle.length;i++){
+      if(vehicle[i]!=" "){
+        vehicleStr+=vehicle[i]
+    }
+  }
+
+ console.log(vehicleStr) 
+
+
+  OwnerInfo.findOne({vehicle_number_plate:vehicleStr})
     .then((data) => {
       console.log(data)
-      if (data == null) {
-        res.status(500).json({ "error": "No such vehicle found" })
+      if (!data) {
+        res.status(200).json({
+        name: vehicleStr,
+        email: 'NA',
+        vehicle_number_plate: vehicleStr,
+        phone: 'NA',
+        address: 'NA',
+        Date: 'NA'
+    }
+  )
       } else {
         res.status(200).send(data) 
       }

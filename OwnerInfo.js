@@ -1,12 +1,30 @@
 const mongoose = require("mongoose")
 
 const OwnerSchema = new mongoose.Schema({
-  name:String,
-  email:String,
-  vehicle_number_plate:String,
-  phone:String,
-  address:String,
-  Date:String
+  name:{
+    type:String,
+    require:true
+  },
+  email:{
+    type:String,
+    require:true
+  },
+  vehicle_number_plate:{
+    type:String,
+    require:true
+  },
+  phone:{
+    type:String,
+    require:true
+  },
+  address:{
+    type:String,
+    require:true
+  },
+  Date:{
+    type:String,
+    require:true
+  }
 })
 
 
