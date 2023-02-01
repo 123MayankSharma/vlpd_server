@@ -99,16 +99,17 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
       vehicle = response.data
     })
     .catch(function(error) {
-      console.log(error)
+      res.status(400).json({errorTitle:"Image Error:",errorMessage:"Please try Again!"})
     });
  
-    // console.log(vehicle)
+    console.log(vehicle)
     
   //delete image it has been processed
   deleteImg(vehicle_number_plate_image)
   //finding if info of a person with the given number plate exists or not
   
   //sanitizing input for spaces
+  
   let vehicleStr=""
 
   for(let i=0;i<vehicle.length;i++){
@@ -119,15 +120,14 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
 
  console.log(vehicleStr) 
 
-
   OwnerInfo.findOne({vehicle_number_plate:vehicleStr})
     .then((data) => {
-      console.log(data)
+      
       if (!data) {
         res.status(200).json({
         name: vehicleStr,
         email: 'NA',
-        vehicle_number_plate: vehicleStr,
+        vehicle_number_plate:vehicleStr,
         phone: 'NA',
         address: 'NA',
         Date: 'NA'

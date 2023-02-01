@@ -28,6 +28,7 @@ const OwnerSchema = new mongoose.Schema({
 })
 
 
+
 mongoose.model("owner",OwnerSchema)
 
 
