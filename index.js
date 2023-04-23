@@ -1,29 +1,29 @@
 const express = require("express");
 const app = express();
-const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const FormData = require("form-data")
-const multer = require("multer")
-const axios = require("axios")
-const fs = require('fs')
-const dotenv=require('dotenv')
+const FormData = require("form-data");
+const multer = require("multer");
+const axios = require("axios");
+const fs = require("fs");
+const dotenv = require("dotenv");
+const OwnerInfo = require("./models/OwnerInfo");
+const Auth = require("./models/AuthModel");
+const cors = require("cors");
+const morgan = require("morgan");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
-dotenv.config()
-require("./OwnerInfo");
-//using body Parser
-app.use(
-  bodyParser.urlencoded({
-    extended: true,
-  })
-);
+dotenv.config();
+app.use(cors());
+app.use(morgan("combined"));
+app.use(express.json());
 
 //basic variables
 const port = 8000;
-const OwnerInfo = mongoose.model("owner");
-const mongoUrl =process.env.MONGO_URL;
+const mongoUrl = process.env.MONGO_URL;
 
 //variable to store path of image which will be temporarily stored
-let vehicle_number_plate_image = ""
+let vehicle_number_plate_image = "";
 
 //specifying paramters to be used while storing image
 const storage = multer.diskStorage({
@@ -33,7 +33,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     //filetype of image of license plate
     const extension = file.mimetype.split("/")[1];
-    vehicle_number_plate_image = `${file.fieldname}-${Date.now()}.${extension}`
+    vehicle_number_plate_image = `${file.fieldname}-${Date.now()}.${extension}`;
     //filename
     cb(null, vehicle_number_plate_image);
   },
@@ -41,7 +41,7 @@ const storage = multer.diskStorage({
 
 // Multer Filter which will filter anything that does not fit in the filter criteria
 const multerFilter = (req, file, cb) => {
-  const allowed_ft = ["jpg", "png", "jpeg"]
+  const allowed_ft = ["jpg", "png", "jpeg"];
   if (allowed_ft.includes(file.mimetype.split("/")[1])) {
     cb(null, true);
   } else {
@@ -52,7 +52,7 @@ const multerFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   fileFilter: multerFilter,
-  limits: { fileSize: 1024 * 1024 * 16 }
+  limits: { fileSize: 1024 * 1024 * 16 },
 });
 
 //variable to store vehicle_number_plate that wil
@@ -71,77 +71,149 @@ mongoose.connection.on("connected", () => {
 mongoose.connection.on("error", (err) => {
   throw err;
 });
-
+/*
+ * @method: Deletes Image
+ */
 const deleteImg = (imagePath) => {
   //deleting the file after it has been processed
   fs.unlink(imagePath, (err) => {
-    if (err) throw err //handle your error the way you want to;
-    console.log(`${imagePath} was deleted`);//or else the file will be deleted
+    if (err) throw err; //handle your error the way you want to;
+    console.log(`${imagePath} was deleted`); //or else the file will be deleted
   });
+};
+/*
+ * endpoint to handle registering a new user
+ */
+app.post("/register", async (req, res) => {
+  try {
+    if (!req.body.password || !req.body.username || !req.body.email) {
+      res.status(400).send("one of the input fields is missing...");
+    } else {
+      //generate hashed password
+      const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
-}
+      const newUser = req.body.role
+        ? new Auth({
+            username: req.body.username,
+            email: req.body.email,
+            password: hashedPassword,
+            userType: "User",
+          })
+        : new Auth({
+            username: req.body.username,
+            email: req.body.email,
+            password: hashedPassword,
+            userType: "Admin",
+          });
+      const user = await newUser.save();
+      res.status(200).json(user);
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+});
+/*
+ * endpoint to handle login
+ */
+app.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await Auth.findOne({ username: username });
 
+    //if user is not found
+    if (!user)
+      return res
+        .status(400)
+        .json({ Error: "Entered email or Password is Incorrect!" });
+
+    //then, validate the password
+    const validatePassword = bcrypt.compare(password, user.password);
+
+    //if password of user stored in db does not match password entered by client return client error
+
+    if (validatePassword) {
+      jwt.sign(
+        {
+          name: user.username /*this object contains payload*/,
+        },
+        process.env.SECRET_KEY,
+        { expiresIn: "3000s" },
+        (err, token) => {
+          if (err) {
+            return res.status(500).json({ error: "backend error..." });
+          }
+          return res
+            .status(200)
+            .json({ token: token, name: username, role: user.userType });
+        }
+      );
+    }
+  } catch (err) {
+    res.status(500).json({ Error: "Username or Password is Incorrect" });
+  }
+});
 app.post("/owner_info", upload.single("image"), async (req, res) => {
-
   //assigning location of image to variable
-  vehicle_number_plate_image = `./uploads/${vehicle_number_plate_image}`
-  let formdata = new FormData()
+  vehicle_number_plate_image = `./uploads/${vehicle_number_plate_image}`;
+  let formdata = new FormData();
   //reading license plate image from it's location using fs
   formdata.append("image", fs.createReadStream(vehicle_number_plate_image));
-  //making  async post request to backend api because the ml model takes some 
+  //making  async post request to backend api because the ml model takes some
   //time for processing
-  await axios.post(process.env.MODEL_API, formdata, {
-    headers: {
-      "Content-Type": "multipart/form-data"
-    }
-  })
-    .then(function(response) {
-      vehicle = response.data
+  await axios
+    .post(process.env.MODEL_API, formdata, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
     })
-    .catch(function(error) {
-      res.status(400).json({errorTitle:"Image Error:",errorMessage:"Please try Again!"})
+    .then(function (response) {
+      vehicle = response.data;
+    })
+    .catch(function (error) {
+      res.status(400).json({
+        errorTitle: "Image Error:",
+        errorMessage: "Please try Again!",
+      });
     });
- 
-    console.log(vehicle)
-    
-  //delete image it has been processed
-  deleteImg(vehicle_number_plate_image)
-  //finding if info of a person with the given number plate exists or not
-  
-  //sanitizing input for spaces
-  
-  let vehicleStr=""
 
-  for(let i=0;i<vehicle.length;i++){
-      if(vehicle[i]!=" "){
-        vehicleStr+=vehicle[i]
+  console.log(vehicle);
+
+  //delete image it has been processed
+  deleteImg(vehicle_number_plate_image);
+  //finding if info of a person with the given number plate exists or not
+
+  //sanitizing input for spaces
+
+  let vehicleStr = "";
+
+  for (let i = 0; i < vehicle.length; i++) {
+    if (vehicle[i] != " ") {
+      vehicleStr += vehicle[i];
     }
   }
 
- console.log(vehicleStr) 
+  console.log(vehicleStr);
 
-  OwnerInfo.findOne({vehicle_number_plate:vehicleStr})
+  OwnerInfo.findOne({ vehicle_number_plate: vehicleStr })
     .then((data) => {
-      
       if (!data) {
         res.status(200).json({
-        name: vehicleStr,
-        email: 'NA',
-        vehicle_number_plate:vehicleStr,
-        phone: 'NA',
-        address: 'NA',
-        Date: 'NA'
-    }
-  )
+          name: vehicleStr,
+          email: "NA",
+          vehicle_number_plate: vehicleStr,
+          phone: "NA",
+          address: "NA",
+          Date: "NA",
+        });
       } else {
-        res.status(200).send(data) 
+        res.status(200).send(data);
       }
     })
     .catch((err) => {
       console.log(err);
     });
-
-})
+});
 
 app.listen(port, () => {
   console.log(`server running at port ${port}`);
