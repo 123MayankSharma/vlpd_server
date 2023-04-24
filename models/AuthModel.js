@@ -13,6 +13,7 @@ const AuthModel = new mongoose.Schema({
   password: {
     type: String,
     min: 6,
+    max: 40,
   },
   userType: {
     type: String,

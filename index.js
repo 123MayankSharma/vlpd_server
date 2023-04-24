@@ -90,27 +90,60 @@ app.post("/register", async (req, res) => {
       res.status(400).send("one of the input fields is missing...");
     } else {
       //generate hashed password
-      const hashedPassword = await bcrypt.hash(req.body.password, 10);
 
-      const newUser = req.body.role
-        ? new Auth({
-            username: req.body.username,
-            email: req.body.email,
-            password: hashedPassword,
-            userType: "User",
-          })
-        : new Auth({
-            username: req.body.username,
-            email: req.body.email,
-            password: hashedPassword,
-            userType: "Admin",
-          });
+      const email = await Auth.findOne({ email: req.body.email });
+      console.log(email);
+      if (email) {
+        return res
+          .status(400)
+          .json({ Message: "User with this Email Already Exists!" });
+      }
+      const saltRounds = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
+
+      const newUser =
+        req.body.role == "Admin"
+          ? new Auth({
+              username: req.body.username,
+              email: req.body.email,
+              password: hashedPassword,
+              userType: "Admin",
+            })
+          : new Auth({
+              username: req.body.username,
+              email: req.body.email,
+              password: hashedPassword,
+              userType: "User",
+            });
       const user = await newUser.save();
-      res.status(200).json(user);
+      if (user) {
+        jwt.sign(
+          {
+            name: user.username /*this object contains payload*/,
+          },
+          process.env.SECRET_KEY,
+          { expiresIn: "3000s" },
+          (err, token) => {
+            if (err) {
+              console.log(err);
+              return res.status(500).json({ error: "backend error..." });
+            }
+            return res
+              .status(200)
+              .json({ token: token, name: user.username, role: user.userType });
+          }
+        );
+      } else {
+        res.status(500).json({
+          Message: "Could Not register you. Please Try again Later..",
+        });
+      }
     }
   } catch (err) {
     console.log(err);
-    res.status(500).send(err);
+    return res.status(500).json({
+      Message: "Could Not register you. Please Try again Later..",
+    });
   }
 });
 /*
@@ -125,7 +158,7 @@ app.post("/login", async (req, res) => {
     if (!user)
       return res
         .status(400)
-        .json({ Error: "Entered email or Password is Incorrect!" });
+        .json({ Message: "Entered email or Password is Incorrect!" });
 
     //then, validate the password
     const validatePassword = bcrypt.compare(password, user.password);
@@ -138,81 +171,187 @@ app.post("/login", async (req, res) => {
           name: user.username /*this object contains payload*/,
         },
         process.env.SECRET_KEY,
-        { expiresIn: "3000s" },
+        { expiresIn: "5000s" },
         (err, token) => {
           if (err) {
-            return res.status(500).json({ error: "backend error..." });
+            return res.status(500).json({ Message: "backend error..." });
           }
           return res
             .status(200)
             .json({ token: token, name: username, role: user.userType });
         }
       );
+    } else {
+      return res
+        .status(400)
+        .json({ Message: "Entered email or Password is Incorrect!" });
     }
   } catch (err) {
-    res.status(500).json({ Error: "Username or Password is Incorrect" });
+    return res
+      .status(500)
+      .json({ Message: "Username or Password is Incorrect" });
   }
 });
+
 app.post("/owner_info", upload.single("image"), async (req, res) => {
-  //assigning location of image to variable
-  vehicle_number_plate_image = `./uploads/${vehicle_number_plate_image}`;
-  let formdata = new FormData();
-  //reading license plate image from it's location using fs
-  formdata.append("image", fs.createReadStream(vehicle_number_plate_image));
-  //making  async post request to backend api because the ml model takes some
-  //time for processing
-  await axios
-    .post(process.env.MODEL_API, formdata, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    })
-    .then(function (response) {
-      vehicle = response.data;
-    })
-    .catch(function (error) {
-      res.status(400).json({
-        errorTitle: "Image Error:",
-        errorMessage: "Please try Again!",
-      });
-    });
-
-  console.log(vehicle);
-
-  //delete image it has been processed
-  deleteImg(vehicle_number_plate_image);
-  //finding if info of a person with the given number plate exists or not
-
-  //sanitizing input for spaces
-
-  let vehicleStr = "";
-
-  for (let i = 0; i < vehicle.length; i++) {
-    if (vehicle[i] != " ") {
-      vehicleStr += vehicle[i];
-    }
-  }
-
-  console.log(vehicleStr);
-
-  OwnerInfo.findOne({ vehicle_number_plate: vehicleStr })
-    .then((data) => {
-      if (!data) {
-        res.status(200).json({
-          name: vehicleStr,
-          email: "NA",
-          vehicle_number_plate: vehicleStr,
-          phone: "NA",
-          address: "NA",
-          Date: "NA",
-        });
-      } else {
-        res.status(200).send(data);
-      }
-    })
-    .catch((err) => {
+  const { token, role } = req.body;
+  console.log(token);
+  console.log(role);
+  jwt.verify(token, process.env.SECRET_KEY, async (err, authData) => {
+    if (err) {
       console.log(err);
-    });
+      return res.status(400).json({
+        errorText: "Verification Error",
+        errorMessage: "Please Log In to Perform This Operation...",
+      });
+    } else {
+      try {
+        //assigning location of image to variable
+        vehicle_number_plate_image = `./uploads/${vehicle_number_plate_image}`;
+        let formdata = new FormData();
+        //reading license plate image from it's location using fs
+        formdata.append(
+          "image",
+          fs.createReadStream(vehicle_number_plate_image)
+        );
+        //making  async post request to backend api because the ml model takes some
+        //time for processing
+        await axios
+          .post(process.env.MODEL_API, formdata, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          })
+          .then(function (response) {
+            vehicle = response.data;
+          })
+          .catch(function (error) {
+            return res.status(400).json({
+              errorTitle: "Image Error:",
+              errorMessage: "Please try Again!",
+            });
+          });
+
+        console.log(vehicle);
+
+        //delete image it has been processed
+        deleteImg(vehicle_number_plate_image);
+        //finding if info of a person with the given number plate exists or not
+
+        //sanitizing input for spaces
+
+        let vehicleStr = "";
+
+        for (let i = 0; i < vehicle.length; i++) {
+          if (vehicle[i] != " ") {
+            vehicleStr += vehicle[i];
+          }
+        }
+
+        console.log(vehicleStr);
+
+        await OwnerInfo.findOne({ vehicle_number_plate: vehicleStr })
+          .then((data) => {
+            if (!data) {
+              if (role == "Admin") {
+                return res.status(200).json({
+                  name: vehicleStr,
+                  email: "NA",
+                  vehicle_number_plate: vehicleStr,
+                  phone: "NA",
+                  address: "NA",
+                  Date: "NA",
+                });
+              } else {
+                return res.status(200).json({
+                  name: vehicleStr,
+                  email: "NA",
+                  vehicle_number_plate: vehicleStr,
+                });
+              }
+            } else {
+              if (role == "Admin") return res.status(200).json(data);
+              else
+                return res.status(200).json({
+                  name: data.name,
+                  email: data.email,
+                  vehicle_number_plate: vehicleStr,
+                });
+            }
+          })
+          .catch((err) => {
+            return res.status(500).json({
+              errorText: "DB Error",
+              errorMessage: "Could Not Access Backend!",
+            });
+          });
+      } catch (err) {
+        console.log(err);
+        return res
+          .status(500)
+          .json({ errorText: "Error", errorMessage: "Backend Error..." });
+      }
+    }
+  });
+  //assigning location of image to variable
+  // vehicle_number_plate_image = `./uploads/${vehicle_number_plate_image}`;
+  // let formdata = new FormData();
+  // //reading license plate image from it's location using fs
+  // formdata.append("image", fs.createReadStream(vehicle_number_plate_image));
+  // //making  async post request to backend api because the ml model takes some
+  // //time for processing
+  // await axios
+  //   .post(process.env.MODEL_API, formdata, {
+  //     headers: {
+  //       "Content-Type": "multipart/form-data",
+  //     },
+  //   })
+  //   .then(function (response) {
+  //     vehicle = response.data;
+  //   })
+  //   .catch(function (error) {
+  //     res.status(400).json({
+  //       errorTitle: "Image Error:",
+  //       errorMessage: "Please try Again!",
+  //     });
+  //   });
+  //
+  // console.log(vehicle);
+  //
+  // //delete image it has been processed
+  // deleteImg(vehicle_number_plate_image);
+  // //finding if info of a person with the given number plate exists or not
+  //
+  // //sanitizing input for spaces
+  //
+  // let vehicleStr = "";
+  //
+  // for (let i = 0; i < vehicle.length; i++) {
+  //   if (vehicle[i] != " ") {
+  //     vehicleStr += vehicle[i];
+  //   }
+  // }
+  //
+  // console.log(vehicleStr);
+  //
+  // OwnerInfo.findOne({ vehicle_number_plate: vehicleStr })
+  //   .then((data) => {
+  //     if (!data) {
+  //       res.status(200).json({
+  //         name: vehicleStr,
+  //         email: "NA",
+  //         vehicle_number_plate: vehicleStr,
+  //         phone: "NA",
+  //         address: "NA",
+  //         Date: "NA",
+  //       });
+  //     } else {
+  //       res.status(200).send(data);
+  //     }
+  //   })
+  //   .catch((err) => {
+  //     console.log(err);
+  //   });
 });
 
 app.listen(port, () => {
