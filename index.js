@@ -87,7 +87,7 @@ const deleteImg = (imagePath) => {
 app.post("/register", async (req, res) => {
   try {
     if (!req.body.password || !req.body.username || !req.body.email) {
-      res.status(400).send("one of the input fields is missing...");
+      return res.status(400).send("one of the input fields is missing...");
     } else {
       //generate hashed password
 
@@ -134,7 +134,7 @@ app.post("/register", async (req, res) => {
           }
         );
       } else {
-        res.status(500).json({
+        return res.status(500).json({
           Message: "Could Not register you. Please Try again Later..",
         });
       }
@@ -161,7 +161,7 @@ app.post("/login", async (req, res) => {
         .json({ Message: "Entered email or Password is Incorrect!" });
 
     //then, validate the password
-    const validatePassword = bcrypt.compare(password, user.password);
+    const validatePassword = await bcrypt.compare(password, user.password);
 
     //if password of user stored in db does not match password entered by client return client error
 
