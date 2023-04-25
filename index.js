@@ -98,6 +98,15 @@ app.post("/register", async (req, res) => {
           .status(400)
           .json({ Message: "User with this Email Already Exists!" });
       }
+
+      const userName = await Auth.findOne({ username: req.body.username });
+
+      if (userName) {
+        return res
+          .status(400)
+          .json({ Message: "User with this Username Already Exists!" });
+      }
+
       const saltRounds = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
 
