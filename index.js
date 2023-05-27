@@ -383,18 +383,31 @@ app.post("/history", async (req, res) => {
 app.post("/HistoryInfo", async (req, res) => {
   const infoId = req.body._id;
   try {
-    await Auth.updateOne(
-      {
-        username: authData.name,
-        "clicked_document.post": data._id,
-      },
-      {
-        $set: {
-          "clicked_document.$.last_accessed": Date.now(),
-        },
+    jwt.verify(
+      req.body.token,
+      process.env.SECRET_KEY,
+      async (err, authData) => {
+        if (err) {
+          return res.status(400).json({
+            errorText: "Verification Error",
+            errorMessage: "Please Log In to Perform This Operation...",
+          });
+        } else {
+          await Auth.updateOne(
+            {
+              username: authData.name,
+              "clicked_document.post": data._id,
+            },
+            {
+              $set: {
+                "clicked_document.$.last_accessed": Date.now(),
+              },
+            }
+          );
+          return res.status(200).json({ Message: "Success!" });
+        }
       }
     );
-    return res.json({ Message: "Success!" });
   } catch (err) {
     return res.status(500).json({
       errorText: "Update Error",
