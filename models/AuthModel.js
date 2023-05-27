@@ -1,5 +1,15 @@
 const mongoose = require("mongoose");
 
+const ownerInfoDoc = new mongoose.Schema({
+  post: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "owner",
+  },
+  last_accessed: {
+    type: Date,
+    default: Date.now,
+  },
+});
 const AuthModel = new mongoose.Schema({
   username: {
     type: String,
@@ -17,6 +27,10 @@ const AuthModel = new mongoose.Schema({
   },
   userType: {
     type: String,
+  },
+  clicked_document: {
+    type: [ownerInfoDoc],
+    index: true,
   },
 });
 

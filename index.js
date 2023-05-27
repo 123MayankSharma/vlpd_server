@@ -241,7 +241,7 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
             });
           });
 
-        console.log(vehicle);
+        console.log("Number Plate" + vehicle);
 
         //delete image it has been processed
         deleteImg(vehicle_number_plate_image);
@@ -256,8 +256,6 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
             vehicleStr += vehicle[i];
           }
         }
-
-        console.log(vehicleStr);
 
         await OwnerInfo.findOne({ vehicle_number_plate: vehicleStr })
           .then((data) => {
@@ -279,6 +277,38 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
                 });
               }
             } else {
+              (async function () {
+                const isUpdated = await Auth.updateOne(
+                  {
+                    username: authData.name,
+                    "clicked_document.post": data._id,
+                  },
+                  {
+                    $set: {
+                      "clicked_document.$.last_accessed": Date.now(),
+                    },
+                  }
+                );
+                if (isUpdated.modifiedCount == 0)
+                  await Auth.updateOne(
+                    {
+                      username: authData.name,
+                      "clicked_document._id": { $ne: data._id },
+                    },
+                    {
+                      $addToSet: {
+                        clicked_document: {
+                          post: data._id,
+                          last_accessed: Date.now(),
+                        },
+                      },
+                    },
+                    {
+                      upsert: true,
+                      new: true,
+                    }
+                  );
+              })();
               if (role == "Admin") return res.status(200).json(data);
               else
                 return res.status(200).json({
@@ -289,6 +319,7 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
             }
           })
           .catch((err) => {
+            console.error(err);
             return res.status(500).json({
               errorText: "DB Error",
               errorMessage: "Could Not Access Backend!",
@@ -302,65 +333,74 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
       }
     }
   });
-  //assigning location of image to variable
-  // vehicle_number_plate_image = `./uploads/${vehicle_number_plate_image}`;
-  // let formdata = new FormData();
-  // //reading license plate image from it's location using fs
-  // formdata.append("image", fs.createReadStream(vehicle_number_plate_image));
-  // //making  async post request to backend api because the ml model takes some
-  // //time for processing
-  // await axios
-  //   .post(process.env.MODEL_API, formdata, {
-  //     headers: {
-  //       "Content-Type": "multipart/form-data",
-  //     },
-  //   })
-  //   .then(function (response) {
-  //     vehicle = response.data;
-  //   })
-  //   .catch(function (error) {
-  //     res.status(400).json({
-  //       errorTitle: "Image Error:",
-  //       errorMessage: "Please try Again!",
-  //     });
-  //   });
-  //
-  // console.log(vehicle);
-  //
-  // //delete image it has been processed
-  // deleteImg(vehicle_number_plate_image);
-  // //finding if info of a person with the given number plate exists or not
-  //
-  // //sanitizing input for spaces
-  //
-  // let vehicleStr = "";
-  //
-  // for (let i = 0; i < vehicle.length; i++) {
-  //   if (vehicle[i] != " ") {
-  //     vehicleStr += vehicle[i];
-  //   }
-  // }
-  //
-  // console.log(vehicleStr);
-  //
-  // OwnerInfo.findOne({ vehicle_number_plate: vehicleStr })
-  //   .then((data) => {
-  //     if (!data) {
-  //       res.status(200).json({
-  //         name: vehicleStr,
-  //         email: "NA",
-  //         vehicle_number_plate: vehicleStr,
-  //         phone: "NA",
-  //         address: "NA",
-  //         Date: "NA",
-  //       });
-  //     } else {
-  //       res.status(200).send(data);
-  //     }
-  //   })
-  //   .catch((err) => {
-  //     console.log(err);
-  //   });
+});
+
+app.post("/history", async (req, res) => {
+  try {
+    //return all the documents from history collection whose user id is same as the user
+    jwt.verify(
+      req.body.token,
+      process.env.SECRET_KEY,
+      async (err, authData) => {
+        if (err) {
+          return res.status(400).json({
+            errorText: "Verification Error",
+            errorMessage: "Please Log In to Perform This Operation...",
+          });
+        } else {
+          try {
+            //fetching history array and populating with references
+            const history = await Auth.find({ user: authData.name })
+              .select("clicked_document")
+              .populate("clicked_document.post");
+            //converting array of object to string
+            posts = JSON.stringify(history[0].clicked_document);
+            //again converting back to array
+            posts = JSON.parse(posts);
+            //sorting in decreasing order
+            posts.sort(
+              (a, b) => new Date(b.last_accessed) - new Date(a.last_accessed)
+            );
+            return res.status(200).json({ history: posts });
+          } catch (err) {
+            console.error(err);
+            return res.status(500).json({
+              errorText: "DB Error",
+              errorMessage: "Please Try again...",
+            });
+          }
+        }
+      }
+    );
+  } catch (err) {
+    return res.status(500).json({
+      errorText: "Backend Error",
+      errorMessage: "Could Not Fetch History! Please Try Again...",
+    });
+  }
+});
+
+app.post("/HistoryInfo", async (req, res) => {
+  const infoId = req.body._id;
+  try {
+    await Auth.updateOne(
+      {
+        username: authData.name,
+        "clicked_document.post": data._id,
+      },
+      {
+        $set: {
+          "clicked_document.$.last_accessed": Date.now(),
+        },
+      }
+    );
+    return res.json({ Message: "Success!" });
+  } catch (err) {
+    return res.status(500).json({
+      errorText: "Update Error",
+      errorMessage: "Could Not Update History",
+    });
+  }
 });
 
 app.listen(port, () => {
