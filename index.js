@@ -350,7 +350,7 @@ app.post("/history", async (req, res) => {
         } else {
           try {
             //fetching history array and populating with references
-            const history = await Auth.find({ user: authData.name })
+            const history = await Auth.find({ username: authData.name })
               .select("clicked_document")
               .populate("clicked_document.post");
             //converting array of object to string
