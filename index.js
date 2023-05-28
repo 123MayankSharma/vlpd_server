@@ -396,7 +396,7 @@ app.post("/HistoryInfo", async (req, res) => {
           await Auth.updateOne(
             {
               username: authData.name,
-              "clicked_document.post": data._id,
+              "clicked_document.post": infoId,
             },
             {
               $set: {
