@@ -429,17 +429,7 @@ app.post("/insertInfo", async (req, res) => {
           });
         } else {
           try {
-            const { vehicle_number_plate, name, email, phone, address, Date } =
-              req.body;
-
-            const newInfo = new OwnerInfo({
-              name,
-              email,
-              vehicle_number_plate,
-              phone,
-              address,
-              Date,
-            });
+            const newInfo = new OwnerInfo(req.body);
             const insertInfo = await newInfo.save();
             (async function () {
               await Auth.updateOne(
