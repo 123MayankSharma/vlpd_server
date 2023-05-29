@@ -416,6 +416,115 @@ app.post("/HistoryInfo", async (req, res) => {
   }
 });
 
+app.post("/insertInfo", async (req, res) => {
+  try {
+    jwt.verify(
+      req.body.token,
+      process.env.SECRET_KEY,
+      async (err, authData) => {
+        if (err) {
+          return res.status(400).json({
+            errorText: "Verification Error",
+            errorMessage: "Please Log In to Perform This Operation...",
+          });
+        } else {
+          try {
+            const newInfo = new OwnerInfo(req.body);
+            await newInfo.save();
+            (async function () {
+              await Auth.updateOne(
+                {
+                  username: authData.name,
+                  "clicked_document._id": { $ne: newInfo._id },
+                },
+                {
+                  $addToSet: {
+                    clicked_document: {
+                      post: newInfo._id,
+                      last_accessed: Date.now(),
+                    },
+                  },
+                },
+                {
+                  upsert: true,
+                  new: true,
+                }
+              );
+            })();
+            return res.status(200).json({
+              Message: `${req.body.vehicle_number_plate} Info Inserted`,
+            });
+          } catch (err) {
+            return res.status(500).json({
+              errorText: "Insert Error",
+              errorMessage: "Could Not Insert Record",
+            });
+          }
+        }
+      }
+    );
+  } catch (err) {
+    return res.status(500).json({
+      errorText: "Insert Error",
+      errorMessage: "Could Not Insert Record",
+    });
+  }
+});
+
+app.post("/UpdateInfo", async (req, res) => {
+  try {
+    jwt.verify(
+      req.body.token,
+      process.env.SECRET_KEY,
+      async (err, authData) => {
+        if (err) {
+          return res.status(400).json({
+            errorText: "Verification Error",
+            errorMessage: "Please Log In to Perform This Operation...",
+          });
+        } else {
+          try {
+            const {
+              vehicle_number_plate,
+              name,
+              email,
+              phone,
+              address,
+              Date,
+              _id,
+            } = req.body;
+            await OwnerInfo.updateOne(
+              { _id: req.body._id },
+              {
+                vehicle_number_plate,
+                name,
+                email,
+                phone,
+                address,
+                Date,
+                _id,
+              }
+            );
+            res.status(200).json({
+              Message: `${req.body.vehicle_number_plate} Info Updated`,
+            });
+          } catch (err) {
+            return res.status(500).json({
+              errorText: "Update Error",
+              errorMessage: `Error While Updating`,
+            });
+          }
+        }
+      }
+    );
+  } catch (err) {
+    return res.status(500).json({
+      errorText: "Update Error",
+      errorMessage: `Error While Updating`,
+    });
+  }
+});
+
 app.listen(port, () => {
   console.log(`server running at port ${port}`);
 });
