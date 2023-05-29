@@ -422,7 +422,7 @@ app.post("/insertInfo", async (req, res) => {
       req.body.token,
       process.env.SECRET_KEY,
       async (err, authData) => {
-        if (err) {
+        if (err || req.body.role != "Admin") {
           return res.status(400).json({
             errorText: "Verification Error",
             errorMessage: "Please Log In to Perform This Operation...",
@@ -477,7 +477,7 @@ app.post("/UpdateInfo", async (req, res) => {
       req.body.token,
       process.env.SECRET_KEY,
       async (err, authData) => {
-        if (err) {
+        if (err || req.body.role != "Admin") {
           return res.status(400).json({
             errorText: "Verification Error",
             errorMessage: "Please Log In to Perform This Operation...",
