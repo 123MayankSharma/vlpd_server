@@ -440,17 +440,17 @@ app.post("/insertInfo", async (req, res) => {
               address,
               Date,
             });
-            await newInfo.save();
+            const insertInfo = await newInfo.save();
             (async function () {
               await Auth.updateOne(
                 {
                   username: authData.name,
-                  "clicked_document.post": { $ne: newInfo._id },
+                  "clicked_document.post": { $ne: insertInfo._id },
                 },
                 {
                   $addToSet: {
                     clicked_document: {
-                      post: newInfo._id,
+                      post: insertInfo._id,
                       last_accessed: Date.now(),
                     },
                   },
