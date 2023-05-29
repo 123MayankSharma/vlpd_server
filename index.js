@@ -422,14 +422,24 @@ app.post("/insertInfo", async (req, res) => {
       req.body.token,
       process.env.SECRET_KEY,
       async (err, authData) => {
-        if (err || req.body.role != "Admin") {
+        if (err || req.body.role !== "Admin") {
           return res.status(400).json({
             errorText: "Verification Error",
             errorMessage: "Please Log In to Perform This Operation...",
           });
         } else {
           try {
-            const newInfo = new OwnerInfo(req.body);
+            const { vehicle_number_plate, name, email, phone, address, Date } =
+              req.body;
+
+            const newInfo = new OwnerInfo({
+              name,
+              email,
+              vehicle_number_plate,
+              phone,
+              address,
+              Date,
+            });
             await newInfo.save();
             (async function () {
               await Auth.updateOne(
