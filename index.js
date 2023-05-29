@@ -293,7 +293,7 @@ app.post("/owner_info", upload.single("image"), async (req, res) => {
                   await Auth.updateOne(
                     {
                       username: authData.name,
-                      "clicked_document._id": { $ne: data._id },
+                      "clicked_document.post": { $ne: data._id },
                     },
                     {
                       $addToSet: {
@@ -445,7 +445,7 @@ app.post("/insertInfo", async (req, res) => {
               await Auth.updateOne(
                 {
                   username: authData.name,
-                  "clicked_document._id": { $ne: newInfo._id },
+                  "clicked_document.post": { $ne: newInfo._id },
                 },
                 {
                   $addToSet: {
